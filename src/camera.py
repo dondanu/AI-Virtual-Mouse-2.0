@@ -40,10 +40,13 @@ class Camera:
         """
         if self._running:
             return True
-        cap = cv2.VideoCapture(self._settings.camera_index, cv2.CAP_DSHOW
-                               if hasattr(cv2, "CAP_DSHOW") else 0)
+        # CAP_DSHOW on Windows is fastest; fallback to default on other OS
+        backend = cv2.CAP_DSHOW if hasattr(cv2, "CAP_DSHOW") else 0
+        cap = cv2.VideoCapture(self._settings.camera_index, backend)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._settings.camera_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._settings.camera_height)
+        cap.set(cv2.CAP_PROP_FPS, 30)                  # Request 30 fps
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)             # Only keep latest frame → less lag
         if not cap.isOpened():
             self.last_error = (
                 "Could not open the webcam. Make sure a camera is connected "
