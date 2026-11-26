@@ -100,9 +100,9 @@ class DashboardPage(tk.Frame):
     # control -----------------------------------------------------------------
 
     def _on_toggle_control(self, enabled: bool) -> None:
-        if self._app.engine.emergency_stopped:
-            self._app.engine.reset_emergency()
         if enabled:
+            # Always reset emergency state when user explicitly turns ON
+            self._app.engine.reset_emergency()
             self._app.engine.enable_control()
         else:
             self._app.engine.disable_control()

@@ -147,7 +147,7 @@ class App(tk.Tk):
         dash = self._pages.get("Dashboard")
         if hasattr(dash, "set_control_switch"):
             dash.set_control_switch(False)
-        self.engine.reset_emergency()
+        # NOTE: do NOT auto-reset emergency — user must re-toggle to resume control.
 
     # ---- periodic status polling ----------------------------------------------
 
@@ -155,6 +155,11 @@ class App(tk.Tk):
         if not self.winfo_exists():
             return
         status = self.engine.get_status()
+        # Keep the dashboard toggle in sync with actual engine state
+        dash = self._pages.get("Dashboard")
+        if dash is not None and hasattr(dash, "set_control_switch"):
+            if not self.engine.control_enabled:
+                dash.set_control_switch(False)
         for page in self._pages.values():
             if hasattr(page, "update_status"):
                 page.update_status(status)

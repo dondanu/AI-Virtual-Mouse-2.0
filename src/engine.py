@@ -204,9 +204,9 @@ class VisionEngine:
             else:
                 self._gestures.recognize(None, now)
                 if self.control_enabled:
-                    # Tracking lost: release everything immediately.
+                    # Tracking lost: release held buttons but keep control ON
+                    # so the user does not need to re-enable after a brief occlusion.
                     mouse_output.release_all()
-                    self.control_enabled = False
 
             self._calibration.tick(dt)
             self._render_overlay(annotated, hands, gesture)
