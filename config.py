@@ -74,8 +74,8 @@ class Settings:
 
     # Cursor control - Gaming optimized settings
     sensitivity: float = 2.8          # Increased from 1.6 for faster aiming
-    smoothing_alpha: float = 0.20     # Reduced from 0.35 for more responsive movement
-    dead_zone_px: float = 1.5         # Reduced from 4.0 for precise control
+    smoothing_alpha: float = 0.35     # Balanced: responsive but not jittery
+    dead_zone_px: float = 3.0         # Ignore micro-tremors below 3px
 
     # Gesture thresholds (ratios of hand size, robust to camera distance)
     pinch_on_threshold: float = 0.28  # pinch distance < this -> pinching
