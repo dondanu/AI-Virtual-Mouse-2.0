@@ -50,13 +50,31 @@ class HandFrame:
         return math.hypot(x2 - x1, y2 - y1)
 
     def finger_extended(self, tip: int, pip: int, mcp: int) -> bool:
-        """A finger counts as extended when its tip is farther from the wrist
-        than its PIP joint and MCP joint (works for any hand orientation)."""
+        """A finger counts as extended when its tip is far from the wrist
+        relative to its base joints.
+
+        Two independent checks (either one passing = extended):
+          1. Distance ordering: tip farther from wrist than both pip and mcp.
+          2. Span check: tip-to-MCP distance > 90% of hand_size (robust to
+             camera angle — works even when the wrist ordering fails).
+        """
         wx, wy = self.landmarks[WRIST]
+
         def d(idx: int) -> float:
             x, y = self.landmarks[idx]
             return math.hypot(x - wx, y - wy)
-        return d(tip) > d(pip) > d(mcp)
+
+        # Check 1: tip must be farther from wrist than BOTH pip and mcp
+        if d(tip) > d(pip) and d(tip) > d(mcp) * 1.1:
+            return True
+
+        # Check 2: direct tip-to-MCP span (angle-independent)
+        tx, ty = self.landmarks[tip]
+        mx, my = self.landmarks[mcp]
+        if math.hypot(tx - mx, ty - my) > self.hand_size * 0.9:
+            return True
+
+        return False
 
     def fingers_extended(self) -> List[bool]:
         """Extended state of [thumb, index, middle, ring, pinky]."""

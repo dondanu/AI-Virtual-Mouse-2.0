@@ -34,7 +34,7 @@ class GestureDetector:
     """
 
     settings: Settings
-    debounce_frames: int = 4
+    debounce_frames: int = 2
 
     _pinch_left_down: bool = field(default=False, init=False)
     _pinch_right_down: bool = field(default=False, init=False)
@@ -158,8 +158,9 @@ class GestureDetector:
             # Three fingers up (index + middle + ring) = STEADY_AIM mode
             return GestureType.STEADY_AIM
         
-        # Partial fist: only thumb extended
-        if n_extended <= 1:
+        # Partial fist: only thumb extended (or nothing). But if INDEX is up,
+        # it's a pointing gesture — must NOT be treated as pause.
+        if n_extended <= 1 and not index_up:
             return GestureType.PAUSE
         
         # Scroll gesture: both index and middle extended, no pinch
