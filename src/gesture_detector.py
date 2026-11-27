@@ -97,78 +97,61 @@ class GestureDetector:
     # ---- raw classification -------------------------------------------------
 
     def _classify_raw(self, hand: HandFrame) -> GestureType:
-        extended = hand.fingers_extended()
-        thumb_up, index_up, middle_up, ring_up, pinky_up = extended
-        n_extended = sum(extended)
+        """Classify hand gesture.
 
-        # Fist check first: if no fingers are extended, it's a fist regardless of distances
-        if n_extended == 0:
-            return GestureType.PAUSE
+        Design principle: DEFAULT TO MOVE.
+        The cursor follows the hand at all times unless a specific gesture
+        (pinch / fist / open-palm) overrides it.  This is the most reliable
+        strategy when finger-extension detection can be noisy.
+        """
+        import math as _math
+        from src.hand_tracker import WRIST
 
-        # Check for pinches - pinch detection doesn't require finger to be "extended"
-        # since pinching brings the tip close to thumb, which may curl the finger slightly
+        hs = max(hand.hand_size, 1e-6)
+        wx, wy = hand.landmarks[WRIST]
+
+        def d_wrist(idx: int) -> float:
+            x, y = hand.landmarks[idx]
+            return _math.hypot(x - wx, y - wy)
+
+        tips = [8, 12, 16, 20]   # index, middle, ring, pinky tips
+        tip_ratios = [d_wrist(t) / hs for t in tips]
+
+        # ── Pinch detection ─────────────────────────────────────────────────
         index_pinching = self._index_pinching(hand)
         middle_pinching = self._middle_pinching(hand)
-        
-        # Distinguish fist from pinch: in a fist, ALL fingertips are close to thumb
-        # In a pinch, only ONE finger is close. Check if at least 3 fingers are close to thumb.
-        if index_pinching or middle_pinching:
-            # Count how many fingertips are close to thumb
-            thumb_index_ratio = hand.dist(4, 8) / max(hand.hand_size, 1e-6)
-            thumb_middle_ratio = hand.dist(4, 12) / max(hand.hand_size, 1e-6)
-            thumb_ring_ratio = hand.dist(4, 16) / max(hand.hand_size, 1e-6)
-            thumb_pinky_ratio = hand.dist(4, 20) / max(hand.hand_size, 1e-6)
-            
-            # Count fingers close to thumb (within tight threshold for fist detection)
-            close_threshold = 0.4  # tighter threshold to detect actual fist
-            close_count = sum([
-                thumb_index_ratio < close_threshold,
-                thumb_middle_ratio < close_threshold,
-                thumb_ring_ratio < close_threshold,
-                thumb_pinky_ratio < close_threshold
-            ])
-            
-            # If 3+ fingers are bunched with thumb, it's a fist, not a pinch
-            if close_count >= 3:
-                return GestureType.PAUSE
-        
-        # If both are pinching, prefer the one that's closer (smaller ratio)
+
         if index_pinching and middle_pinching:
-            index_ratio = hand.dist(4, 8) / max(hand.hand_size, 1e-6)
-            middle_ratio = hand.dist(4, 12) / max(hand.hand_size, 1e-6)
-            if index_ratio < middle_ratio:
+            if hand.dist(4, 8) < hand.dist(4, 12):
                 middle_pinching = False
             else:
                 index_pinching = False
-        
+
         if index_pinching:
             return GestureType.LEFT_CLICK
         if middle_pinching:
             return GestureType.RIGHT_CLICK
 
-        if n_extended >= 5:
-            return GestureType.RESUME
-        
-        # Gaming gestures: 4 fingers for reload, 3 fingers for steady aim
-        if n_extended == 4 and not thumb_up:
-            # Four fingers up (no thumb) = RELOAD
-            return GestureType.RELOAD
-        
-        if n_extended == 3 and index_up and middle_up and ring_up and not pinky_up:
-            # Three fingers up (index + middle + ring) = STEADY_AIM mode
-            return GestureType.STEADY_AIM
-        
-        # Partial fist: only thumb extended (or nothing). But if INDEX is up,
-        # it's a pointing gesture — must NOT be treated as pause.
-        if n_extended <= 1 and not index_up:
+        # ── Fist detection ───────────────────────────────────────────────────
+        # In a fist ALL 4 fingertips collapse close to the wrist (ratio < 0.85).
+        # Pointing index: index tip is far (~1.86), others ~0.7 → fist_count = 3, NOT 4.
+        # Requires exactly 4 to avoid false positives on pointing gestures.
+        fist_count = sum(r < 0.85 for r in tip_ratios)
+        if fist_count == 4:
             return GestureType.PAUSE
-        
-        # Scroll gesture: both index and middle extended, no pinch
-        if index_up and middle_up and not ring_up and not pinky_up:
+
+        # ── Open palm = resume ───────────────────────────────────────────────
+        if all(r > 1.5 for r in tip_ratios):
+            return GestureType.RESUME
+
+        # ── Scroll: index + middle far from wrist, ring + pinky close ───────
+        idx_r, mid_r, ring_r, pinky_r = tip_ratios
+        if idx_r > 1.4 and mid_r > 1.4 and ring_r < 0.9 and pinky_r < 0.9:
             return GestureType.SCROLL
-        if index_up:
-            return GestureType.MOVE
-        return GestureType.NONE
+
+        # ── DEFAULT: move cursor ─────────────────────────────────────────────
+        # Any hand that isn't a fist/pinch/special gesture just moves.
+        return GestureType.MOVE
 
     def pinch_active(self, hand: HandFrame) -> bool:
         """True when thumb is pinched against index or middle finger."""
