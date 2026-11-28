@@ -49,16 +49,16 @@ class EMASmoother:
 
         # Adaptive alpha: fast = more responsive, slow = more stable
         # speed < 3px  → use 60% of base alpha (very smooth, no jitter)
-        # speed 3-20px → linearly ramp up
-        # speed > 20px → use 1.4x base alpha capped at 0.95 (fast tracking)
+        # speed 3-20px → linearly ramp up to base alpha
+        # speed > 20px → use base alpha directly (never exceed configured value)
         base = self.alpha
         if speed < 3:
             adaptive_alpha = base * 0.6
         elif speed > 20:
-            adaptive_alpha = min(0.95, base * 1.4)
+            adaptive_alpha = base  # At full speed, use configured alpha as-is
         else:
             t = (speed - 3) / 17.0  # 0..1
-            adaptive_alpha = base * (0.6 + t * 0.8)
+            adaptive_alpha = base * (0.6 + t * 0.4)
 
         a = adaptive_alpha
         self._state = (
